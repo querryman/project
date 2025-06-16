@@ -27,6 +27,19 @@ type Item = Database['public']['Tables']['items']['Row'] & {
   } | null;
 };
 
+const getTopUniqueBids = (bids: Bid[]): Bid[] => {
+  const userHighestBids = new Map<string, Bid>();
+  bids.forEach(bid => {
+    const existingBid = userHighestBids.get(bid.user_id);
+    if (!existingBid || existingBid.amount < bid.amount) {
+      userHighestBids.set(bid.user_id, bid);
+    }
+  });
+  return Array.from(userHighestBids.values())
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+};
+
 export const ProductPage: React.FC = () => {
   // State and Hooks (keep only one set)
   // State
@@ -535,7 +548,7 @@ export const ProductPage: React.FC = () => {
                               <div className="text-gray-500">No bids yet.</div>
                             ) : (
                               <ul className="divide-y divide-gray-200">
-                                {bids.map((bid) => (
+                                {getTopUniqueBids(bids).map((bid) => (
                                   <li key={bid.id} className="py-2 flex items-center">
                                     {bid.profiles?.avatar_url ? (
                                       <img src={bid.profiles.avatar_url} alt={bid.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
