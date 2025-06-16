@@ -64,7 +64,56 @@ export const ProductPage: React.FC = () => {
   const { convertPrice, formatPrice, currentCurrency } = useCurrency();
 
   useEffect(() => {
-    // Fetch offers/bids if needed
+    const fetchItem = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select(`
+            *,
+            user_id,
+            sale_type,
+            profiles:user_id(
+              username,
+              avatar_url
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        // Ensure sale_type is set explicitly if not present in data
+        setItem({ ...data, sale_type: data?.sale_type });
+        if (data?.images && data.images.length > 0) {
+          setSelectedImage(data.images[0]);
+        }
+
+        // Check if user has already shown interest
+        if (user) {
+          const { data: interestData } = await supabase
+            .from('interests')
+            .select('*')
+            .eq('listing_id', id)
+            .eq('interested_user_id', user.id)
+            .eq('listing_type', 'item');
+
+          setHasShownInterest(!!(interestData && interestData.length > 0));
+        }
+      } catch (error) {
+        console.error('Error fetching item:', error);
+        toast.error('Failed to load item details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchItem();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, user]);
+
+  // Fetch offers/bids when item or sale_type changes
+  useEffect(() => {
     const fetchOffers = async () => {
       if (id && item?.sale_type === 'offer') {
         setFetchingOffers(true);
@@ -97,51 +146,7 @@ export const ProductPage: React.FC = () => {
     };
     fetchOffers();
     fetchBids();
-
-    const fetchItem = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('items')
-          .select(`
-            *,
-            profiles:user_id(
-              username,
-              avatar_url
-            )
-          `)
-          .eq('id', id)
-          .single();
-
-        if (error) throw error;
-        setItem(data);
-        if (data?.images && data.images.length > 0) {
-          setSelectedImage(data.images[0]);
-        }
-
-        // Check if user has already shown interest
-        if (user) {
-          const { data: interestData } = await supabase
-            .from('interests')
-            .select('*')
-            .eq('listing_id', id)
-            .eq('interested_user_id', user.id)
-            .eq('listing_type', 'item');
-
-          setHasShownInterest(!!(interestData && interestData.length > 0));
-        }
-      } catch (error) {
-        console.error('Error fetching item:', error);
-        toast.error('Failed to load item details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchItem();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, user, item?.sale_type]);
+  }, [id, item?.sale_type]);
 
   const handleShowInterest = async () => {
     if (!user) {
@@ -479,92 +484,133 @@ export const ProductPage: React.FC = () => {
                       )}
                       {item.sale_type === 'auction' && (
                         <React.Fragment>
-                          <h3 className="text-lg font-medium text-gray-900 mb-4">Place a Bid</h3>
-                          <input
-                            type="number"
-                            value={bidAmount}
-                            onChange={e => setBidAmount(e.target.value)}
-                            placeholder="Your bid"
-                            className="w-full rounded-md border-gray-300 mb-2"
-                          />
-                          <textarea
-                            value={message}
-                            onChange={e => setMessage(e.target.value)}
-                            placeholder="Message (optional)"
-                            rows={2}
-                            className="w-full rounded-md border-gray-300 mb-2"
-                          />
-                          <button
-                            onClick={async () => {
-                              if (!user) {
-                                toast.error('Please log in to place a bid');
-                                navigate('/login');
-                                return;
-                              }
-                              if (!bidAmount) {
-                                toast.error('Please enter your bid amount');
-                                return;
-                              }
-                              const bidValue = parseFloat(bidAmount);
-                              if (isNaN(bidValue) || bidValue <= 0) {
-                                toast.error('Please enter a valid bid amount');
-                                return;
-                              }
-                              // Find the current highest bid
-                              const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
-                              if (bidValue <= highestBid) {
-                                toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBid)})`);
-                                return;
-                              }
-                              // Check if user already has a bid
-                              const existingBid = bids.find(b => b.user_id === user.id);
-                              try {
-                                setSubmitting(true);
-                                let error;
-                                if (existingBid) {
-                                  // Update existing bid
-                                  ({ error } = await supabase
-                                    .from('bids')
-                                    .update({ amount: bidValue, message })
-                                    .eq('id', existingBid.id)
-                                  );
-                                } else {
-                                  // Insert new bid
-                                  ({ error } = await supabase
-                                    .from('bids')
-                                    .insert({
-                                      listing_id: id,
-                                      user_id: user.id,
-                                      amount: bidValue,
-                                      message,
-                                    })
-                                  );
+                          {/* Seller-only: End Auction button if not sold */}
+                          {user?.id === item.user_id && item.status !== 'sold' && (
+                            <button
+                              className="mb-4 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                              onClick={async () => {
+                                try {
+                                  setSubmitting(true);
+                                  // Update item status to 'sold'
+                                  const { error } = await supabase
+                                    .from('items')
+                                    .update({ status: 'sold' })
+                                    .eq('id', item.id);
+                                  if (error) throw error;
+                                  toast.success('Auction ended. Highest bid accepted.');
+                                  // Refresh item
+                                  const { data, error: fetchError } = await supabase
+                                    .from('items')
+                                    .select(`*, profiles:user_id(username, avatar_url)`)
+                                    .eq('id', item.id)
+                                    .single();
+                                  if (!fetchError) setItem(data);
+                                } catch (err) {
+                                  toast.error('Failed to end auction.');
+                                } finally {
+                                  setSubmitting(false);
                                 }
-                                if (error) throw error;
-                                toast.success(existingBid ? 'Bid updated!' : 'Bid placed!');
-                                setBidAmount('');
-                                setMessage('');
-                                // Refresh bids
-                                setFetchingBids(true);
-                                const { data } = await supabase
-                                  .from('bids')
-                                  .select('*, profiles:user_id(username, avatar_url)')
-                                  .eq('listing_id', id)
-                                  .order('created_at', { ascending: false });
-                                setBids(data || []);
-                                setFetchingBids(false);
-                              } catch (error) {
-                                toast.error('Failed to place bid');
-                              } finally {
-                                setSubmitting(false);
-                              }
-                            }}
-                            disabled={submitting}
-                            className="bg-yellow-500 text-purple-900 px-6 py-3 rounded-md hover:bg-yellow-400 disabled:opacity-50"
-                          >
-                            {submitting ? 'Placing...' : 'Place Bid'}
-                          </button>
-                          {/* List of bids */}
+                              }}
+                              disabled={submitting}
+                            >
+                              {submitting ? 'Ending Auction...' : 'End Auction & Accept Highest Bid'}
+                            </button>
+                          )}
+                          {/* If sold, show message and hide bid UI */}
+                          {item.status === 'sold' ? (
+                            <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
+                              Auction ended. Item is sold.
+                            </div>
+                          ) : (
+                            <>
+                              <h3 className="text-lg font-medium text-gray-900 mb-4">Place a Bid</h3>
+                              <input
+                                type="number"
+                                value={bidAmount}
+                                onChange={e => setBidAmount(e.target.value)}
+                                placeholder="Your bid"
+                                className="w-full rounded-md border-gray-300 mb-2"
+                              />
+                              <textarea
+                                value={message}
+                                onChange={e => setMessage(e.target.value)}
+                                placeholder="Message (optional)"
+                                rows={2}
+                                className="w-full rounded-md border-gray-300 mb-2"
+                              />
+                              <button
+                                onClick={async () => {
+                                  if (!user) {
+                                    toast.error('Please log in to place a bid');
+                                    navigate('/login');
+                                    return;
+                                  }
+                                  if (!bidAmount) {
+                                    toast.error('Please enter your bid amount');
+                                    return;
+                                  }
+                                  const bidValue = parseFloat(bidAmount);
+                                  if (isNaN(bidValue) || bidValue <= 0) {
+                                    toast.error('Please enter a valid bid amount');
+                                    return;
+                                  }
+                                  // Find the current highest bid
+                                  const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
+                                  if (bidValue <= highestBid) {
+                                    toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBid)})`);
+                                    return;
+                                  }
+                                  // Check if user already has a bid
+                                  const existingBid = bids.find(b => b.user_id === user.id);
+                                  try {
+                                    setSubmitting(true);
+                                    let error;
+                                    if (existingBid) {
+                                      // Update existing bid
+                                      ({ error } = await supabase
+                                        .from('bids')
+                                        .update({ amount: bidValue, message })
+                                        .eq('id', existingBid.id)
+                                      );
+                                    } else {
+                                      // Insert new bid
+                                      ({ error } = await supabase
+                                        .from('bids')
+                                        .insert({
+                                          listing_id: id,
+                                          user_id: user.id,
+                                          amount: bidValue,
+                                          message,
+                                        })
+                                      );
+                                    }
+                                    if (error) throw error;
+                                    toast.success(existingBid ? 'Bid updated!' : 'Bid placed!');
+                                    setBidAmount('');
+                                    setMessage('');
+                                    // Refresh bids
+                                    setFetchingBids(true);
+                                    const { data } = await supabase
+                                      .from('bids')
+                                      .select('*, profiles:user_id(username, avatar_url)')
+                                      .eq('listing_id', id)
+                                      .order('created_at', { ascending: false });
+                                    setBids(data || []);
+                                    setFetchingBids(false);
+                                  } catch (error) {
+                                    toast.error('Failed to place bid');
+                                  } finally {
+                                    setSubmitting(false);
+                                  }
+                                }}
+                                disabled={submitting}
+                                className="bg-yellow-500 text-purple-900 px-6 py-3 rounded-md hover:bg-yellow-400 disabled:opacity-50"
+                              >
+                                {submitting ? 'Placing...' : 'Place Bid'}
+                              </button>
+                            </>
+                          )}
+                          {/* List of bids (always visible) */}
                           <div className="mt-6">
                             <h4 className="font-semibold mb-2">Bids</h4>
                             {fetchingBids ? (

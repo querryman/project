@@ -648,6 +648,34 @@ export const ProfilePage: React.FC = () => {
                                 {item.sale_type === 'auction' && (
                                   <div className="p-4 border-t border-gray-100">
                                   <h4 className="font-semibold mb-2">Bids</h4>
+                                  {/* End Auction button for seller if not sold */}
+                                  {user?.id === item.user_id && item.status !== 'sold' && (
+                                    <button
+                                      className="mb-4 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                                      onClick={async () => {
+                                        try {
+                                          // Update item status to 'sold'
+                                          const { error } = await supabase
+                                            .from('items')
+                                            .update({ status: 'sold' })
+                                            .eq('id', item.id);
+                                          if (error) throw error;
+                                          toast.success('Auction ended. Highest bid accepted.');
+                                          // Refresh items
+                                          const { data: itemsData, error: itemsError } = await supabase
+                                            .from('items')
+                                            .select('*')
+                                            .eq('user_id', user.id)
+                                            .order('created_at', { ascending: false });
+                                          if (!itemsError) setItems(itemsData || []);
+                                        } catch (err) {
+                                          toast.error('Failed to end auction.');
+                                        }
+                                      }}
+                                    >
+                                      End Auction & Accept Highest Bid
+                                    </button>
+                                  )}
                                   {(bidsByItem[item.id]?.length ?? 0) === 0 ? (
                                     <div className="text-gray-500">No bids yet.</div>
                                   ) : (
