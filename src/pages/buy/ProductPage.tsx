@@ -492,18 +492,43 @@ export const ProductPage: React.FC = () => {
                                 toast.error('Please enter your bid amount');
                                 return;
                               }
+                              const bidValue = parseFloat(bidAmount);
+                              if (isNaN(bidValue) || bidValue <= 0) {
+                                toast.error('Please enter a valid bid amount');
+                                return;
+                              }
+                              // Find the current highest bid
+                              const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
+                              if (bidValue <= highestBid) {
+                                toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBid)})`);
+                                return;
+                              }
+                              // Check if user already has a bid
+                              const existingBid = bids.find(b => b.user_id === user.id);
                               try {
                                 setSubmitting(true);
-                                const { error } = await supabase
-                                  .from('bids')
-                                  .insert({
-                                    listing_id: id,
-                                    user_id: user.id,
-                                    amount: parseFloat(bidAmount),
-                                    message,
-                                  });
+                                let error;
+                                if (existingBid) {
+                                  // Update existing bid
+                                  ({ error } = await supabase
+                                    .from('bids')
+                                    .update({ amount: bidValue, message })
+                                    .eq('id', existingBid.id)
+                                  );
+                                } else {
+                                  // Insert new bid
+                                  ({ error } = await supabase
+                                    .from('bids')
+                                    .insert({
+                                      listing_id: id,
+                                      user_id: user.id,
+                                      amount: bidValue,
+                                      message,
+                                    })
+                                  );
+                                }
                                 if (error) throw error;
-                                toast.success('Bid placed!');
+                                toast.success(existingBid ? 'Bid updated!' : 'Bid placed!');
                                 setBidAmount('');
                                 setMessage('');
                                 // Refresh bids
