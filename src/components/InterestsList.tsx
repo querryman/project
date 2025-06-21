@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import type { Offer, Bid } from '../types/supabase';
 import { Database } from '../types/supabase';
 
 type Interest = Database['public']['Tables']['interests']['Row'] & {
@@ -19,41 +20,39 @@ type Resume = Database['public']['Tables']['resumes']['Row'] & {
 interface InterestsListProps {
   listingId: string;
   listingType: 'item' | 'job' | 'service';
+  offers?: Offer[];
+  bids?: Bid[];
+  showOffers?: boolean;
+  showBids?: boolean;
 }
 
-export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listingType }) => {
+export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listingType, offers, bids, showOffers, showBids }) => {
   const [interests, setInterests] = useState<Interest[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (offers || bids) {
+      setLoading(false);
+      return;
+    }
     const fetchData = async () => {
       try {
         setLoading(true);
-        
         // Fetch interests
         const { data: interestsData, error: interestsError } = await supabase
           .from('interests')
-          .select(`
-            *,
-            profiles:interested_user_id(username, avatar_url)
-          `)
+          .select(`*, profiles:interested_user_id(username, avatar_url)`)
           .eq('listing_id', listingId)
           .eq('listing_type', listingType);
-
         if (interestsError) throw interestsError;
         setInterests(interestsData || []);
-
         // If this is a job listing, also fetch resumes
         if (listingType === 'job') {
           const { data: resumesData, error: resumesError } = await supabase
             .from('resumes')
-            .select(`
-              *,
-              profiles:user_id(username, avatar_url)
-            `)
+            .select(`*, profiles:user_id(username, avatar_url)`)
             .eq('job_id', listingId);
-
           if (resumesError) throw resumesError;
           setResumes(resumesData || []);
         }
@@ -63,12 +62,85 @@ export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listing
         setLoading(false);
       }
     };
-
     fetchData();
-  }, [listingId, listingType]);
+  }, [listingId, listingType, offers, bids]);
 
   if (loading) {
     return <div className="py-4 text-center text-gray-500">Loading interested users...</div>;
+  }
+
+  // If offers or bids are provided, render them instead of interests
+  if (showOffers && offers) {
+    return (
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Offers ({offers.length})</h3>
+        </div>
+        {offers.length === 0 ? (
+          <div className="py-4 text-center text-gray-500">No offers yet.</div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {offers.map((offer) => (
+              <li key={offer.id} className="p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    {offer.profiles?.avatar_url ? (
+                      <img src={offer.profiles.avatar_url} alt={offer.profiles.username || 'User'} className="h-10 w-10 rounded-full" />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-purple-200 flex items-center justify-center">
+                        <span className="text-lg font-medium text-purple-800">{(offer.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900">{offer.profiles?.username || 'Anonymous User'}</p>
+                    <p className="text-sm text-purple-700 font-semibold">{offer.amount}</p>
+                    <p className="text-sm text-gray-500">Offered on {new Date(offer.created_at).toLocaleDateString()}</p>
+                    {offer.message && <p className="mt-2 text-sm text-gray-800 bg-purple-50 p-3 rounded">{offer.message}</p>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+  if (showBids && bids) {
+    return (
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Bids ({bids.length})</h3>
+        </div>
+        {bids.length === 0 ? (
+          <div className="py-4 text-center text-gray-500">No bids yet.</div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {bids.map((bid) => (
+              <li key={bid.id} className="p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    {bid.profiles?.avatar_url ? (
+                      <img src={bid.profiles.avatar_url} alt={bid.profiles.username || 'User'} className="h-10 w-10 rounded-full" />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-purple-200 flex items-center justify-center">
+                        <span className="text-lg font-medium text-purple-800">{(bid.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900">{bid.profiles?.username || 'Anonymous User'}</p>
+                    <p className="text-sm text-purple-700 font-semibold">{bid.amount}</p>
+                    <p className="text-sm text-gray-500">Bid on {new Date(bid.created_at).toLocaleDateString()}</p>
+                    {bid.message && <p className="mt-2 text-sm text-gray-800 bg-purple-50 p-3 rounded">{bid.message}</p>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   }
 
   if (interests.length === 0 && resumes.length === 0) {

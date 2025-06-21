@@ -254,3 +254,15 @@ export interface Database {
     }
   }
 }
+
+// --- Offer and Bid Types ---
+export type Offer = {
+  id: string;
+  user_id: string;
+  amount: number;
+  message: string | null;
+  created_at: string;
+  listing_id: string;
+  profiles?: { username: string | null; avatar_url: string | null } | null;
+};
+export type Bid = Offer;

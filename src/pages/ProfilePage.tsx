@@ -607,100 +607,48 @@ export const ProfilePage: React.FC = () => {
                                 <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
                                 <div className="bg-gray-50 p-4 border-b border-gray-200">
                                   <div className="flex justify-between items-center">
-                                  <h3 className="text-lg font-medium text-gray-900">{item.title}</h3>
-                                  <span className="text-sm text-gray-500">
-                                    Listed: {new Date(item.created_at).toLocaleDateString()}
-                                  </span>
+                                    <h3 className="text-lg font-medium text-gray-900">{item.title}</h3>
+                                    <span className="text-sm text-gray-500">
+                                      Listed: {new Date(item.created_at).toLocaleDateString()}
+                                    </span>
                                   </div>
-                                  <p className="text-sm text-gray-600 mt-1">{item.description}</p>
                                 </div>
-                                <InterestsList listingId={item.id} listingType="item" />
-                                {/* Show offers if sale_type is offer */}
-                                {item.sale_type === 'offer' && (
-                                  <div className="p-4 border-t border-gray-100">
-                                  <h4 className="font-semibold mb-2">Offers</h4>
-                                  {(offersByItem[item.id]?.length ?? 0) === 0 ? (
-                                    <div className="text-gray-500">No offers yet.</div>
-                                  ) : (
-                                    <ul className="divide-y divide-gray-200">
-                                    {offersByItem[item.id].map((offer) => (
-                                      <li key={offer.id} className="py-2 flex items-center">
-                                      {offer.profiles?.avatar_url ? (
-                                        <img src={offer.profiles.avatar_url} alt={offer.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
-                                      ) : (
-                                        <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center mr-2">
-                                        <span className="text-sm font-medium text-purple-800">{(offer.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
-                                        </div>
-                                      )}
-                                      <div>
-                                        <span className="font-medium">{offer.profiles?.username || 'Anonymous'}</span>
-                                        <span className="ml-2 text-purple-700 font-semibold">{offer.amount}</span>
-                                        <span className="ml-2 text-xs text-gray-500">{new Date(offer.created_at).toLocaleDateString()}</span>
-                                        {offer.message && <div className="text-xs text-gray-700 mt-1">{offer.message}</div>}
-                                      </div>
-                                      </li>
-                                    ))}
-                                    </ul>
-                                  )}
-                                  </div>
+                                {/* End Auction button for seller if not sold */}
+                                {item.sale_type === 'auction' && user?.id === item.user_id && item.status !== 'sold' && (
+                                  <button
+                                    className="m-4 mb-0 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                                    onClick={async () => {
+                                      try {
+                                        // Update item status to 'sold'
+                                        const { error } = await supabase
+                                          .from('items')
+                                          .update({ status: 'sold' })
+                                          .eq('id', item.id);
+                                        if (error) throw error;
+                                        toast.success('Auction ended. Highest bid accepted.');
+                                        // Refresh items
+                                        const { data: itemsData, error: itemsError } = await supabase
+                                          .from('items')
+                                          .select('*')
+                                          .eq('user_id', user.id)
+                                          .order('created_at', { ascending: false });
+                                        if (!itemsError) setItems(itemsData || []);
+                                      } catch (err) {
+                                        toast.error('Failed to end auction.');
+                                      }
+                                    }}
+                                  >
+                                    End Auction & Accept Highest Bid
+                                  </button>
                                 )}
-                                {/* Show bids if sale_type is auction */}
-                                {item.sale_type === 'auction' && (
-                                  <div className="p-4 border-t border-gray-100">
-                                  <h4 className="font-semibold mb-2">Bids</h4>
-                                  {/* End Auction button for seller if not sold */}
-                                  {user?.id === item.user_id && item.status !== 'sold' && (
-                                    <button
-                                      className="mb-4 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-                                      onClick={async () => {
-                                        try {
-                                          // Update item status to 'sold'
-                                          const { error } = await supabase
-                                            .from('items')
-                                            .update({ status: 'sold' })
-                                            .eq('id', item.id);
-                                          if (error) throw error;
-                                          toast.success('Auction ended. Highest bid accepted.');
-                                          // Refresh items
-                                          const { data: itemsData, error: itemsError } = await supabase
-                                            .from('items')
-                                            .select('*')
-                                            .eq('user_id', user.id)
-                                            .order('created_at', { ascending: false });
-                                          if (!itemsError) setItems(itemsData || []);
-                                        } catch (err) {
-                                          toast.error('Failed to end auction.');
-                                        }
-                                      }}
-                                    >
-                                      End Auction & Accept Highest Bid
-                                    </button>
-                                  )}
-                                  {(bidsByItem[item.id]?.length ?? 0) === 0 ? (
-                                    <div className="text-gray-500">No bids yet.</div>
-                                  ) : (
-                                    <ul className="divide-y divide-gray-200">
-                                    {bidsByItem[item.id].map((bid) => (
-                                      <li key={bid.id} className="py-2 flex items-center">
-                                      {bid.profiles?.avatar_url ? (
-                                        <img src={bid.profiles.avatar_url} alt={bid.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
-                                      ) : (
-                                        <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center mr-2">
-                                        <span className="text-sm font-medium text-purple-800">{(bid.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
-                                        </div>
-                                      )}
-                                      <div>
-                                        <span className="font-medium">{bid.profiles?.username || 'Anonymous'}</span>
-                                        <span className="ml-2 text-purple-700 font-semibold">{bid.amount}</span>
-                                        <span className="ml-2 text-xs text-gray-500">{new Date(bid.created_at).toLocaleDateString()}</span>
-                                        {bid.message && <div className="text-xs text-gray-700 mt-1">{bid.message}</div>}
-                                      </div>
-                                      </li>
-                                    ))}
-                                    </ul>
-                                  )}
-                                  </div>
-                                )}
+                                <InterestsList
+                                  listingId={item.id}
+                                  listingType="item"
+                                  offers={item.sale_type === 'offer' ? offersByItem[item.id] : undefined}
+                                  showOffers={item.sale_type === 'offer'}
+                                  bids={item.sale_type === 'auction' ? bidsByItem[item.id] : undefined}
+                                  showBids={item.sale_type === 'auction'}
+                                />
                                 </div>
                             ))}
                           </div>
