@@ -345,6 +345,31 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
     }
     // If sold, show message and hide bid UI
     if (item.status === 'sold') {
+      // Find the current user's bid/offer
+      const myBid = bids.find(bid => bid.user_id === user?.id);
+      const myOffer = offers.find(offer => offer.user_id === user?.id);
+      // For auctions: show payment button if user is highest bidder and status is 'payment processing'
+      if (item.sale_type === 'auction' && myBid && myBid.status === 'payment processing') {
+        return (
+          <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
+            Auction ended. Item is sold.
+            <div className="mt-2 bg-green-100 text-green-800 p-2 rounded font-semibold">
+              You are the highest bidder! Please proceed with payment.
+              <button className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Complete Payment</button>
+            </div>
+          </div>
+        );
+      }
+      // For offers: show payment button if user is highest offerer and status is 'payment processing'
+      if (item.sale_type === 'offer' && myOffer && myOffer.status === 'payment processing') {
+        return (
+          <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
+            Offer accepted. Please proceed with payment.
+            <button className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Complete Payment</button>
+          </div>
+        );
+      }
+      // Default: show status messages
       return (
         <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
           Auction ended. Item is sold.

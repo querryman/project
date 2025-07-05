@@ -232,7 +232,81 @@ const SellerMainContent: React.FC<SellerMainContentProps> = ({
                           </span>
                         </div>
                       </div>
-                      {/* Show interested users for this item */}
+                      {/* Seller action buttons for auction/offer items */}
+                      {(item.sale_type === 'auction' || item.sale_type === 'offer') && user?.id === item.user_id && item.status !== 'sold' && (
+                        <button
+                          className={`m-4 mb-0 px-6 py-2 rounded-md text-white ${item.sale_type === 'auction' ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                          onClick={async () => {
+                            try {
+                              if (item.sale_type === 'auction') {
+                                // --- Auction: update bids status ---
+                                const bids = bidsByItem[item.id] || [];
+                                const sortedBids = [...bids].sort((a, b) => b.amount - a.amount);
+                                const highestBid = sortedBids[0];
+                                if (highestBid) {
+                                  // Mark highest as 'payment processing'
+                                  const highestRes = await supabase
+                                    .from('bids')
+                                    .update({ status: 'payment processing' })
+                                    .eq('id', highestBid.id);
+                                  if (highestRes.error) throw highestRes.error;
+                                  // Mark others as 'waiting for final payment'
+                                  if (sortedBids.length > 1) {
+                                    const otherIds = sortedBids.slice(1).map(b => b.id);
+                                    const othersRes = await supabase
+                                      .from('bids')
+                                      .update({ status: 'waiting for final payment' })
+                                      .in('id', otherIds);
+                                    if (othersRes.error) throw othersRes.error;
+                                  }
+                                }
+                              } else if (item.sale_type === 'offer') {
+                                // --- Offer: update offer status ---
+                                const offers = offersByItem[item.id] || [];
+                                const sortedOffers = [...offers].sort((a, b) => b.amount - a.amount);
+                                const highestOffer = sortedOffers[0];
+                                if (highestOffer) {
+                                  // Mark as 'accepted'
+                                  const highestRes = await supabase
+                                    .from('offers')
+                                    .update({ status: 'accepted' })
+                                    .eq('id', highestOffer.id);
+                                  if (highestRes.error) throw highestRes.error;
+                                  // Mark others as 'rejected'
+                                  if (sortedOffers.length > 1) {
+                                    const otherIds = sortedOffers.slice(1).map(o => o.id);
+                                    const othersRes = await supabase
+                                      .from('offers')
+                                      .update({ status: 'rejected' })
+                                      .in('id', otherIds);
+                                    if (othersRes.error) throw othersRes.error;
+                                  }
+                                }
+                              }
+                              // --- Update item status to sold ---
+                              const { error: itemError } = await supabase
+                                .from('items')
+                                .update({ status: 'sold' })
+                                .eq('id', item.id);
+                              if (itemError) throw itemError;
+                              // --- Refresh items ---
+                              const { data: updatedItems, error: itemsError } = await supabase
+                                .from('items')
+                                .select('*')
+                                .eq('user_id', user.id);
+                              if (itemsError) throw itemsError;
+                              setItems(updatedItems);
+                              toast.success('Bid/Offer status updated successfully');
+                            } catch (error) {
+                              console.error('Error updating bid/offer status:', error);
+                              toast.error('Failed to update bid/offer status');
+                            }
+                          }}
+                        >
+                          {item.sale_type === 'auction' ? 'End Auction & Accept Highest Bid' : 'Accept Highest Offer'}
+                        </button>
+                      )}
+                      {/* Show bids/offers/interests for this item */}
                       <InterestsList
                         listingId={item.id}
                         listingType="item"
