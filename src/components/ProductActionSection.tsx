@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface ProductActionSectionProps {
   item: any;
@@ -47,6 +48,8 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
   toast,
   supabase,
 }) => {
+  const { convertPrice, currentCurrency } = useCurrency();
+
   // Handler for making an offer
   const handleOffer = async () => {
     if (!user) {
@@ -60,12 +63,15 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
     }
     try {
       setSubmitting(true);
+      // Convert offerAmount from user's currency to USD before saving
+      const offerValue = parseFloat(offerAmount);
+      const offerInUSD = convertPrice(offerValue, currentCurrency?.code || 'USD', 'USD');
       const { error } = await supabase
         .from('offers')
         .insert({
           listing_id: item.id,
           user_id: user.id,
-          amount: parseFloat(offerAmount),
+          amount: offerInUSD,
           message,
         });
       if (error) throw error;
@@ -102,12 +108,15 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
       toast.error('Please enter a valid bid amount');
       return;
     }
-    // Find the current highest bid
-    const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
-    if (bidValue <= highestBid) {
-      toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBid)})`);
+    // Find the current highest bid (convert all to user's currency for comparison)
+    const highestBidUSD = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
+    const highestBidInUserCurrency = convertPrice(highestBidUSD, 'USD', currentCurrency?.code || 'USD');
+    if (bidValue <= highestBidInUserCurrency) {
+      toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBidInUserCurrency, currentCurrency?.code)})`);
       return;
     }
+    // Convert bidValue from user's currency to USD before saving
+    const bidInUSD = convertPrice(bidValue, currentCurrency?.code || 'USD', 'USD');
     // Check if user already has a bid
     const existingBid = bids.find(b => b.user_id === user.id);
     try {
@@ -117,7 +126,7 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
         // Update existing bid
         ({ error } = await supabase
           .from('bids')
-          .update({ amount: bidValue, message })
+          .update({ amount: bidInUSD, message })
           .eq('id', existingBid.id)
         );
       } else {
@@ -127,7 +136,7 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
           .insert({
             listing_id: item.id,
             user_id: user.id,
-            amount: bidValue,
+            amount: bidInUSD,
             message,
           })
         );
