@@ -6,18 +6,20 @@ type Offer = {
   message: string | null;
   created_at: string;
   profiles?: { username: string | null; avatar_url: string | null } | null;
+  status?: string; // Add status for payment flow
 };
 type Bid = Offer;
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Heart, ArrowLeft, User } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
 import { Database } from '../../types/supabase';
+import ProductActionSection from '../../components/ProductActionSection';
 
 type Item = Database['public']['Tables']['items']['Row'] & {
   sale_type?: string;
@@ -25,19 +27,6 @@ type Item = Database['public']['Tables']['items']['Row'] & {
     username: string | null;
     avatar_url: string | null;
   } | null;
-};
-
-const getTopUniqueBids = (bids: Bid[]): Bid[] => {
-  const userHighestBids = new Map<string, Bid>();
-  bids.forEach(bid => {
-    const existingBid = userHighestBids.get(bid.user_id);
-    if (!existingBid || existingBid.amount < bid.amount) {
-      userHighestBids.set(bid.user_id, bid);
-    }
-  });
-  return Array.from(userHighestBids.values())
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 5);
 };
 
 export const ProductPage: React.FC = () => {
@@ -338,310 +327,33 @@ export const ProductPage: React.FC = () => {
                     </div>
                   </div>
                   {user?.id !== item.user_id && (
-                    <div className="border-t border-gray-200 pt-6">
-                      {/* Sale type logic for action buttons */}
-                      {item.sale_type === 'fixed' && (
-                        hasShownInterest ? (
-                          <div className="bg-green-50 p-4 rounded-lg">
-                            <div className="flex">
-                              <div className="flex-shrink-0">
-                                <Heart className="h-5 w-5 text-green-400" />
-                              </div>
-                              <div className="ml-3">
-                                <h3 className="text-sm font-medium text-green-800">
-                                  Interest Shown
-                                </h3>
-                                <p className="mt-2 text-sm text-green-700">
-                                  You've already shown interest in this item. The seller will contact you soon.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <React.Fragment>
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
-                              Interested in this item?
-                            </h3>
-                            <div className="space-y-4">
-                              <textarea
-                                value={message}
-                                onChange={(e) => setMessage(e.target.value)}
-                                placeholder="Write a message to the seller..."
-                                rows={4}
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                              />
-                              <div className="flex space-x-4">
-                                <button
-                                  onClick={handleShowInterest}
-                                  disabled={submitting}
-                                  className="flex-1 bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50"
-                                >
-                                  {submitting ? 'Sending...' : 'Show Interest'}
-                                </button>
-                                <button
-                                  onClick={() => window.location.href = `mailto:?subject=Check out this item on Tradex&body=I found this interesting item: ${item.title}%0D%0A%0D%0ACheck it out here: ${window.location.href}`}
-                                  className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50"
-                                >
-                                  <Heart className="h-5 w-5 text-gray-400" />
-                                </button>
-                              </div>
-                            </div>
-                          </React.Fragment>
-                        )
-                      )}
-                      {item.sale_type === 'offer' && (
-                        <React.Fragment>
-                          <h3 className="text-lg font-medium text-gray-900 mb-4">Make an Offer</h3>
-                          <input
-                            type="number"
-                            value={offerAmount}
-                            onChange={e => setOfferAmount(e.target.value)}
-                            placeholder="Your offer"
-                            className="w-full rounded-md border-gray-300 mb-2"
-                          />
-                          <textarea
-                            value={message}
-                            onChange={e => setMessage(e.target.value)}
-                            placeholder="Message (optional)"
-                            rows={2}
-                            className="w-full rounded-md border-gray-300 mb-2"
-                          />
-                          <button
-                            onClick={async () => {
-                              if (!user) {
-                                toast.error('Please log in to make an offer');
-                                navigate('/login');
-                                return;
-                              }
-                              if (!offerAmount) {
-                                toast.error('Please enter your offer amount');
-                                return;
-                              }
-                              try {
-                                setSubmitting(true);
-                                const { error } = await supabase
-                                  .from('offers')
-                                  .insert({
-                                    listing_id: id,
-                                    user_id: user.id,
-                                    amount: parseFloat(offerAmount),
-                                    message,
-                                  });
-                                if (error) throw error;
-                                toast.success('Offer sent!');
-                                setOfferAmount('');
-                                setMessage('');
-                                // Refresh offers
-                                setFetchingOffers(true);
-                                const { data } = await supabase
-                                  .from('offers')
-                                  .select('*, profiles:user_id(username, avatar_url)')
-                                  .eq('listing_id', id)
-                                  .order('created_at', { ascending: false });
-                                setOffers(data || []);
-                                setFetchingOffers(false);
-                              } catch (error) {
-                                toast.error('Failed to send offer');
-                              } finally {
-                                setSubmitting(false);
-                              }
-                            }}
-                            disabled={submitting}
-                            className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 disabled:opacity-50"
-                          >
-                            {submitting ? 'Sending...' : 'Send Offer'}
-                          </button>
-                          {/* List of offers */}
-                          <div className="mt-6">
-                            <h4 className="font-semibold mb-2">Offers</h4>
-                            {fetchingOffers ? (
-                              <div className="text-gray-500">Loading offers...</div>
-                            ) : offers.length === 0 ? (
-                              <div className="text-gray-500">No offers yet.</div>
-                            ) : (
-                              <ul className="divide-y divide-gray-200">
-                                {offers.map((offer) => (
-                                  <li key={offer.id} className="py-2 flex items-center">
-                                    {offer.profiles?.avatar_url ? (
-                                      <img src={offer.profiles.avatar_url} alt={offer.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
-                                    ) : (
-                                      <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center mr-2">
-                                        <span className="text-sm font-medium text-purple-800">{(offer.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
-                                      </div>
-                                    )}
-                                    <div>
-                                      <span className="font-medium">{offer.profiles?.username || 'Anonymous'}</span>
-                                      <span className="ml-2 text-purple-700 font-semibold">{formatPrice(offer.amount)}</span>
-                                      <span className="ml-2 text-xs text-gray-500">{new Date(offer.created_at).toLocaleDateString()}</span>
-                                      {offer.message && <div className="text-xs text-gray-700 mt-1">{offer.message}</div>}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </React.Fragment>
-                      )}
-                      {item.sale_type === 'auction' && (
-                        <React.Fragment>
-                          {/* Seller-only: End Auction button if not sold */}
-                          {user?.id === item.user_id && item.status !== 'sold' && (
-                            <button
-                              className="mb-4 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-                              onClick={async () => {
-                                try {
-                                  setSubmitting(true);
-                                  // Update item status to 'sold'
-                                  const { error } = await supabase
-                                    .from('items')
-                                    .update({ status: 'sold' })
-                                    .eq('id', item.id);
-                                  if (error) throw error;
-                                  toast.success('Auction ended. Highest bid accepted.');
-                                  // Refresh item
-                                  const { data, error: fetchError } = await supabase
-                                    .from('items')
-                                    .select(`*, profiles:user_id(username, avatar_url)`)
-                                    .eq('id', item.id)
-                                    .single();
-                                  if (!fetchError) setItem(data);
-                                } catch (err) {
-                                  toast.error('Failed to end auction.');
-                                } finally {
-                                  setSubmitting(false);
-                                }
-                              }}
-                              disabled={submitting}
-                            >
-                              {submitting ? 'Ending Auction...' : 'End Auction & Accept Highest Bid'}
-                            </button>
-                          )}
-                          {/* If sold, show message and hide bid UI */}
-                          {item.status === 'sold' ? (
-                            <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
-                              Auction ended. Item is sold.
-                            </div>
-                          ) : (
-                            <>
-                              <h3 className="text-lg font-medium text-gray-900 mb-4">Place a Bid</h3>
-                              <input
-                                type="number"
-                                value={bidAmount}
-                                onChange={e => setBidAmount(e.target.value)}
-                                placeholder="Your bid"
-                                className="w-full rounded-md border-gray-300 mb-2"
-                              />
-                              <textarea
-                                value={message}
-                                onChange={e => setMessage(e.target.value)}
-                                placeholder="Message (optional)"
-                                rows={2}
-                                className="w-full rounded-md border-gray-300 mb-2"
-                              />
-                              <button
-                                onClick={async () => {
-                                  if (!user) {
-                                    toast.error('Please log in to place a bid');
-                                    navigate('/login');
-                                    return;
-                                  }
-                                  if (!bidAmount) {
-                                    toast.error('Please enter your bid amount');
-                                    return;
-                                  }
-                                  const bidValue = parseFloat(bidAmount);
-                                  if (isNaN(bidValue) || bidValue <= 0) {
-                                    toast.error('Please enter a valid bid amount');
-                                    return;
-                                  }
-                                  // Find the current highest bid
-                                  const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
-                                  if (bidValue <= highestBid) {
-                                    toast.error(`Your bid must be higher than the current highest bid (${formatPrice(highestBid)})`);
-                                    return;
-                                  }
-                                  // Check if user already has a bid
-                                  const existingBid = bids.find(b => b.user_id === user.id);
-                                  try {
-                                    setSubmitting(true);
-                                    let error;
-                                    if (existingBid) {
-                                      // Update existing bid
-                                      ({ error } = await supabase
-                                        .from('bids')
-                                        .update({ amount: bidValue, message })
-                                        .eq('id', existingBid.id)
-                                      );
-                                    } else {
-                                      // Insert new bid
-                                      ({ error } = await supabase
-                                        .from('bids')
-                                        .insert({
-                                          listing_id: id,
-                                          user_id: user.id,
-                                          amount: bidValue,
-                                          message,
-                                        })
-                                      );
-                                    }
-                                    if (error) throw error;
-                                    toast.success(existingBid ? 'Bid updated!' : 'Bid placed!');
-                                    setBidAmount('');
-                                    setMessage('');
-                                    // Refresh bids
-                                    setFetchingBids(true);
-                                    const { data } = await supabase
-                                      .from('bids')
-                                      .select('*, profiles:user_id(username, avatar_url)')
-                                      .eq('listing_id', id)
-                                      .order('created_at', { ascending: false });
-                                    setBids(data || []);
-                                    setFetchingBids(false);
-                                  } catch (error) {
-                                    toast.error('Failed to place bid');
-                                  } finally {
-                                    setSubmitting(false);
-                                  }
-                                }}
-                                disabled={submitting}
-                                className="bg-yellow-500 text-purple-900 px-6 py-3 rounded-md hover:bg-yellow-400 disabled:opacity-50"
-                              >
-                                {submitting ? 'Placing...' : 'Place Bid'}
-                              </button>
-                            </>
-                          )}
-                          {/* List of bids (always visible) */}
-                          <div className="mt-6">
-                            <h4 className="font-semibold mb-2">Bids</h4>
-                            {fetchingBids ? (
-                              <div className="text-gray-500">Loading bids...</div>
-                            ) : bids.length === 0 ? (
-                              <div className="text-gray-500">No bids yet.</div>
-                            ) : (
-                              <ul className="divide-y divide-gray-200">
-                                {getTopUniqueBids(bids).map((bid) => (
-                                  <li key={bid.id} className="py-2 flex items-center">
-                                    {bid.profiles?.avatar_url ? (
-                                      <img src={bid.profiles.avatar_url} alt={bid.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
-                                    ) : (
-                                      <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center mr-2">
-                                        <span className="text-sm font-medium text-purple-800">{(bid.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
-                                      </div>
-                                    )}
-                                    <div>
-                                      <span className="font-medium">{bid.profiles?.username || 'Anonymous'}</span>
-                                      <span className="ml-2 text-purple-700 font-semibold">{formatPrice(bid.amount)}</span>
-                                      <span className="ml-2 text-xs text-gray-500">{new Date(bid.created_at).toLocaleDateString()}</span>
-                                      {bid.message && <div className="text-xs text-gray-700 mt-1">{bid.message}</div>}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </React.Fragment>
-                      )}
-                    </div>
+                    <ProductActionSection
+                      item={item}
+                      user={user}
+                      hasShownInterest={hasShownInterest}
+                      message={message}
+                      setMessage={setMessage}
+                      submitting={submitting}
+                      handleShowInterest={handleShowInterest}
+                      offerAmount={offerAmount}
+                      setOfferAmount={setOfferAmount}
+                      bidAmount={bidAmount}
+                      setBidAmount={setBidAmount}
+                      handleOffer={() => {}}
+                      handleBid={() => {}}
+                      offers={offers}
+                      bids={bids}
+                      fetchingOffers={fetchingOffers}
+                      fetchingBids={fetchingBids}
+                      formatPrice={formatPrice}
+                      navigate={navigate}
+                      setSubmitting={setSubmitting}
+                      setOffers={setOffers}
+                      setBids={setBids}
+                      toast={toast}
+                      supabase={supabase}
+                      id={id || ''}
+                    />
                   )}
                 </div>
               </div>

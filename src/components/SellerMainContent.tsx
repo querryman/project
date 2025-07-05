@@ -1,0 +1,338 @@
+import React from 'react';
+import { ShoppingCart, Briefcase, Wrench, Heart, MessageSquare, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Card } from './Card';
+import { InterestsList } from './InterestsList';
+
+interface SellerMainContentProps {
+  items: any[];
+  jobs: any[];
+  services: any[];
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  viewMode: 'listings' | 'interests';
+  setViewMode: (mode: 'listings' | 'interests') => void;
+  offersByItem: { [itemId: string]: any[] };
+  bidsByItem: { [itemId: string]: any[] };
+  user: any;
+  supabase: any;
+  setItems: (items: any[]) => void;
+  toast: any;
+}
+
+const SellerMainContent: React.FC<SellerMainContentProps> = ({
+  items,
+  jobs,
+  services,
+  activeTab,
+  setActiveTab,
+  viewMode,
+  setViewMode,
+  offersByItem,
+  bidsByItem,
+  user,
+  supabase,
+  setItems,
+  toast,
+}) => {
+  // --- Listings/Interests Tabs ---
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+      <div className="border-b border-gray-200">
+        <div className="flex justify-between p-4">
+          <div className="flex space-x-4 items-center">
+            <button
+              className={`px-4 py-2 font-medium rounded-md ${viewMode === 'listings' ? 'bg-purple-100 text-purple-800' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setViewMode('listings')}
+            >
+              My Listings
+            </button>
+            <button
+              className={`px-4 py-2 font-medium rounded-md ${viewMode === 'interests' ? 'bg-purple-100 text-purple-800' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setViewMode('interests')}
+            >
+              Interested Users
+            </button>
+          </div>
+        </div>
+      </div>
+      {viewMode === 'listings' ? (
+        <div>
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'items' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('items')}
+            >
+              <div className="flex items-center justify-center">
+                <ShoppingCart className={`h-5 w-5 ${activeTab === 'items' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Items ({items.length})
+              </div>
+            </button>
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'jobs' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('jobs')}
+            >
+              <div className="flex items-center justify-center">
+                <Briefcase className={`h-5 w-5 ${activeTab === 'jobs' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Jobs ({jobs.length})
+              </div>
+            </button>
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'services' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('services')}
+            >
+              <div className="flex items-center justify-center">
+                <Wrench className={`h-5 w-5 ${activeTab === 'services' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Services ({services.length})
+              </div>
+            </button>
+          </div>
+          <div className="p-4">
+            {activeTab === 'items' && (
+              items.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {items.map((item) => (
+                    <Card
+                      key={item.id}
+                      id={item.id}
+                      type="item"
+                      title={item.title}
+                      description={item.description || ''}
+                      price={item.price}
+                      currencyCode={item.currency_code}
+                      image={item.images && item.images.length > 0 ? item.images[0] : undefined}
+                      category={item.category}
+                      createdAt={item.created_at}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No items listed yet</h3>
+                  <p className="text-gray-600 mb-4">Start selling by listing your first item</p>
+                  <Link
+                    to="/sell"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <ShoppingCart className="mr-2 h-5 w-5" />
+                    List an Item
+                  </Link>
+                </div>
+              )
+            )}
+            {activeTab === 'jobs' && (
+              jobs.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {jobs.map((job) => (
+                    <Card
+                      key={job.id}
+                      id={job.id}
+                      type="job"
+                      title={job.title}
+                      description={job.description}
+                      price={job.salary || undefined}
+                      currencyCode={job.currency_code}
+                      category={job.job_type}
+                      createdAt={job.created_at}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No jobs posted yet</h3>
+                  <p className="text-gray-600 mb-4">Start recruiting by posting your first job</p>
+                  <Link
+                    to="/post-job"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <Briefcase className="mr-2 h-5 w-5" />
+                    Post a Job
+                  </Link>
+                </div>
+              )
+            )}
+            {activeTab === 'services' && (
+              services.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {services.map((service) => (
+                    <Card
+                      key={service.id}
+                      id={service.id}
+                      type="service"
+                      title={service.title}
+                      description={service.description}
+                      price={service.price}
+                      currencyCode={service.currency_code}
+                      category={service.category}
+                      createdAt={service.created_at}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Wrench className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No services offered yet</h3>
+                  <p className="text-gray-600 mb-4">Start offering your expertise as a service</p>
+                  <Link
+                    to="/post-service"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <Wrench className="mr-2 h-5 w-5" />
+                    Offer a Service
+                  </Link>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'items' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('items')}
+            >
+              <div className="flex items-center justify-center">
+                <Heart className={`h-5 w-5 ${activeTab === 'items' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Item Interests
+              </div>
+            </button>
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'jobs' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('jobs')}
+            >
+              <div className="flex items-center justify-center">
+                <MessageSquare className={`h-5 w-5 ${activeTab === 'jobs' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Job Applications
+              </div>
+            </button>
+            <button
+              className={`flex-1 py-3 px-4 text-center ${activeTab === 'services' ? 'border-b-2 border-purple-600 text-purple-700 font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setActiveTab('services')}
+            >
+              <div className="flex items-center justify-center">
+                <Clock className={`h-5 w-5 ${activeTab === 'services' ? 'text-purple-700' : 'text-gray-500'} mr-2`} />
+                Service Requests
+              </div>
+            </button>
+          </div>
+          <div className="p-4">
+            {activeTab === 'items' && (
+              items.length > 0 ? (
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 p-4 border-b border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-medium text-gray-900">{item.title}</h3>
+                          <span className="text-sm text-gray-500">
+                            Listed: {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      {(item.sale_type === 'auction' || item.sale_type === 'offer') && user?.id === item.user_id && item.status !== 'sold' && (
+                        <button
+                          className={`m-4 mb-0 px-6 py-2 rounded-md text-white ${item.sale_type === 'auction' ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                          onClick={async () => {
+                            try {
+                              const { error } = await supabase
+                                .from('items')
+                                .update({ status: 'sold' })
+                                .eq('id', item.id);
+                              if (error) throw error;
+                              toast.success(item.sale_type === 'auction' ? 'Auction ended. Highest bid accepted.' : 'Offer accepted. Highest offer is now payment processing.');
+                              const { data: itemsData, error: itemsError } = await supabase
+                                .from('items')
+                                .select('*')
+                                .eq('user_id', user.id)
+                                .order('created_at', { ascending: false });
+                              if (!itemsError) setItems(itemsData || []);
+                            } catch (err) {
+                              toast.error(item.sale_type === 'auction' ? 'Failed to end auction.' : 'Failed to accept offer.');
+                            }
+                          }}
+                        >
+                          {item.sale_type === 'auction' ? 'End Auction & Accept Highest Bid' : 'Accept Highest Offer'}
+                        </button>
+                      )}
+                      <InterestsList
+                        listingId={item.id}
+                        listingType="item"
+                        offers={item.sale_type === 'offer' ? offersByItem[item.id] : undefined}
+                        showOffers={item.sale_type === 'offer'}
+                        bids={item.sale_type === 'auction' ? bidsByItem[item.id] : undefined}
+                        showBids={item.sale_type === 'auction'}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No items listed yet</h3>
+                  <p className="text-gray-600">List items to see who's interested</p>
+                </div>
+              )
+            )}
+            {activeTab === 'jobs' && (
+              jobs.length > 0 ? (
+                <div className="space-y-4">
+                  {jobs.map((job) => (
+                    <div key={job.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 p-4 border-b border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-medium text-gray-900">{job.title}</h3>
+                          <span className="text-sm text-gray-500">
+                            Posted: {new Date(job.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{job.job_type} at {job.location || 'Remote'}</p>
+                      </div>
+                      <InterestsList listingId={job.id} listingType="job" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No jobs posted yet</h3>
+                  <p className="text-gray-600">Post jobs to see applications</p>
+                </div>
+              )
+            )}
+            {activeTab === 'services' && (
+              services.length > 0 ? (
+                <div className="space-y-4">
+                  {services.map((service) => (
+                    <div key={service.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 p-4 border-b border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-medium text-gray-900">{service.title}</h3>
+                          <span className="text-sm text-gray-500">
+                            Listed: {new Date(service.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{service.category}</p>
+                      </div>
+                      <InterestsList listingId={service.id} listingType="service" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Wrench className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No services offered yet</h3>
+                  <p className="text-gray-600">Offer services to see requests</p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SellerMainContent;
