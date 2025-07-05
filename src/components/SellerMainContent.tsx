@@ -232,47 +232,30 @@ const SellerMainContent: React.FC<SellerMainContentProps> = ({
                           </span>
                         </div>
                       </div>
-                      {(item.sale_type === 'auction' || item.sale_type === 'offer') && user?.id === item.user_id && item.status !== 'sold' && (
-                        <button
-                          className={`m-4 mb-0 px-6 py-2 rounded-md text-white ${item.sale_type === 'auction' ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'}`}
-                          onClick={async () => {
-                            try {
-                              const { error } = await supabase
-                                .from('items')
-                                .update({ status: 'sold' })
-                                .eq('id', item.id);
-                              if (error) throw error;
-                              toast.success(item.sale_type === 'auction' ? 'Auction ended. Highest bid accepted.' : 'Offer accepted. Highest offer is now payment processing.');
-                              const { data: itemsData, error: itemsError } = await supabase
-                                .from('items')
-                                .select('*')
-                                .eq('user_id', user.id)
-                                .order('created_at', { ascending: false });
-                              if (!itemsError) setItems(itemsData || []);
-                            } catch (err) {
-                              toast.error(item.sale_type === 'auction' ? 'Failed to end auction.' : 'Failed to accept offer.');
-                            }
-                          }}
-                        >
-                          {item.sale_type === 'auction' ? 'End Auction & Accept Highest Bid' : 'Accept Highest Offer'}
-                        </button>
-                      )}
+                      {/* Show interested users for this item */}
                       <InterestsList
                         listingId={item.id}
                         listingType="item"
-                        offers={item.sale_type === 'offer' ? offersByItem[item.id] : undefined}
-                        showOffers={item.sale_type === 'offer'}
-                        bids={item.sale_type === 'auction' ? bidsByItem[item.id] : undefined}
-                        showBids={item.sale_type === 'auction'}
+                        offers={offersByItem[item.id]}
+                        showOffers={!!offersByItem[item.id] && offersByItem[item.id].length > 0}
+                        bids={bidsByItem[item.id]}
+                        showBids={!!bidsByItem[item.id] && bidsByItem[item.id].length > 0}
                       />
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No items listed yet</h3>
-                  <p className="text-gray-600">List items to see who's interested</p>
+                  <Heart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No item interests yet</h3>
+                  <p className="text-gray-600 mb-4">Users will show interest in your items here</p>
+                  <Link
+                    to="/"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <Heart className="mr-2 h-5 w-5" />
+                    Explore Items
+                  </Link>
                 </div>
               )
             )}
@@ -288,17 +271,32 @@ const SellerMainContent: React.FC<SellerMainContentProps> = ({
                             Posted: {new Date(job.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{job.job_type} at {job.location || 'Remote'}</p>
                       </div>
-                      <InterestsList listingId={job.id} listingType="job" />
+                      <div className="p-4">
+                        <p className="text-gray-700 mb-4">{job.description}</p>
+                        <Link
+                          to={`/job/${job.id}`}
+                          className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                        >
+                          <Briefcase className="mr-2 h-5 w-5" />
+                          View Applications
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No jobs posted yet</h3>
-                  <p className="text-gray-600">Post jobs to see applications</p>
+                  <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No job applications yet</h3>
+                  <p className="text-gray-600 mb-4">Applicants will show up here once you have job postings</p>
+                  <Link
+                    to="/post-job"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <Briefcase className="mr-2 h-5 w-5" />
+                    Post a Job
+                  </Link>
                 </div>
               )
             )}
@@ -311,20 +309,35 @@ const SellerMainContent: React.FC<SellerMainContentProps> = ({
                         <div className="flex justify-between items-center">
                           <h3 className="text-lg font-medium text-gray-900">{service.title}</h3>
                           <span className="text-sm text-gray-500">
-                            Listed: {new Date(service.created_at).toLocaleDateString()}
+                            Offered: {new Date(service.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{service.category}</p>
                       </div>
-                      <InterestsList listingId={service.id} listingType="service" />
+                      <div className="p-4">
+                        <p className="text-gray-700 mb-4">{service.description}</p>
+                        <Link
+                          to={`/service/${service.id}`}
+                          className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                        >
+                          <Wrench className="mr-2 h-5 w-5" />
+                          View Requests
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Wrench className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No services offered yet</h3>
-                  <p className="text-gray-600">Offer services to see requests</p>
+                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No service requests yet</h3>
+                  <p className="text-gray-600 mb-4">Service requests will appear here once you start offering services</p>
+                  <Link
+                    to="/post-service"
+                    className="inline-flex items-center bg-purple-700 text-white px-4 py-2 rounded-md hover:bg-purple-800 transition-colors"
+                  >
+                    <Wrench className="mr-2 h-5 w-5" />
+                    Offer a Service
+                  </Link>
                 </div>
               )
             )}

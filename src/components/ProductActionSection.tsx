@@ -121,25 +121,37 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
     const existingBid = bids.find(b => b.user_id === user.id);
     try {
       setSubmitting(true);
-      let error;
+      let error, updateResult;
       if (existingBid) {
         // Update existing bid
-        ({ error } = await supabase
+        updateResult = await supabase
           .from('bids')
           .update({ amount: bidInUSD, message })
-          .eq('id', existingBid.id)
-        );
+          .eq('id', existingBid.id);
+        error = updateResult.error;
+        if (error) {
+          console.error('Bid update error:', error, 'Params:', { amount: bidInUSD, message, id: existingBid.id });
+          toast.error('Failed to update bid: ' + error.message);
+        } else {
+          console.log('Bid update success:', updateResult);
+        }
       } else {
         // Insert new bid
-        ({ error } = await supabase
+        updateResult = await supabase
           .from('bids')
           .insert({
             listing_id: item.id,
             user_id: user.id,
             amount: bidInUSD,
             message,
-          })
-        );
+          });
+        error = updateResult.error;
+        if (error) {
+          console.error('Bid insert error:', error, 'Params:', { listing_id: item.id, user_id: user.id, amount: bidInUSD, message });
+          toast.error('Failed to place bid: ' + error.message);
+        } else {
+          console.log('Bid insert success:', updateResult);
+        }
       }
       if (error) throw error;
       toast.success(existingBid ? 'Bid updated!' : 'Bid placed!');
@@ -274,26 +286,48 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
               // Find the highest bid
               const sortedBids = [...bids].sort((a, b) => b.amount - a.amount);
               const highestBid = sortedBids[0];
+              // DEBUG: Log bids and highestBid before updating
+              console.log('End Auction Clicked. Bids:', bids, 'Sorted:', sortedBids, 'Highest:', highestBid);
               // Mark highest as 'payment processing', others as 'waiting for final payment'
+              let bidUpdateResult, bidUpdateError;
               if (highestBid) {
-                await supabase
+                bidUpdateResult = await supabase
                   .from('bids')
                   .update({ status: 'payment processing' })
                   .eq('id', highestBid.id);
+                bidUpdateError = bidUpdateResult.error;
+                if (bidUpdateError) {
+                  console.error('Bid status update error (highest):', bidUpdateError, 'Params:', { id: highestBid.id });
+                  toast.error('Failed to update highest bid status: ' + bidUpdateError.message);
+                } else {
+                  console.log('Bid status update success (highest):', bidUpdateResult);
+                }
                 if (sortedBids.length > 1) {
                   const otherIds = sortedBids.slice(1).map(b => b.id);
-                  await supabase
+                  const otherUpdateResult = await supabase
                     .from('bids')
                     .update({ status: 'waiting for final payment' })
                     .in('id', otherIds);
+                  if (otherUpdateResult.error) {
+                    console.error('Bid status update error (others):', otherUpdateResult.error, 'Params:', { ids: otherIds });
+                    toast.error('Failed to update other bids status: ' + otherUpdateResult.error.message);
+                  } else {
+                    console.log('Bid status update success (others):', otherUpdateResult);
+                  }
                 }
               }
               // Update item status to 'sold'
-              const { error } = await supabase
+              const { error: itemError, ...itemUpdateResult } = await supabase
                 .from('items')
                 .update({ status: 'sold' })
                 .eq('id', item.id);
-              if (error) throw error;
+              if (itemError) {
+                console.error('Item status update error:', itemError, 'Params:', { id: item.id });
+                toast.error('Failed to update item status: ' + itemError.message);
+                throw itemError;
+              } else {
+                console.log('Item status update success:', itemUpdateResult);
+              }
               toast.success('Auction ended. Highest bid accepted.');
               // Refresh item and bids
               // (Assume parent will refresh state as needed)
@@ -360,6 +394,72 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
       </>
     );
   }
+
+  if (item.sale_type === 'offer' && user?.id === item.user_id && item.status !== 'sold') {
+    return (
+      <button
+        className="mb-4 bg-yellow-600 text-white px-6 py-2 rounded-md hover:bg-yellow-700"
+        onClick={async () => {
+          try {
+            setSubmitting(true);
+            // Find the highest offer
+            const sortedOffers = [...offers].sort((a, b) => b.amount - a.amount);
+            const highestOffer = sortedOffers[0];
+            // Mark highest as 'payment processing', others as 'waiting for final payment'
+            let offerUpdateResult, offerUpdateError;
+            if (highestOffer) {
+              offerUpdateResult = await supabase
+                .from('offers')
+                .update({ status: 'payment processing' })
+                .eq('id', highestOffer.id);
+              offerUpdateError = offerUpdateResult.error;
+              if (offerUpdateError) {
+                console.error('Offer status update error (highest):', offerUpdateError, 'Params:', { id: highestOffer.id });
+                toast.error('Failed to update highest offer status: ' + offerUpdateError.message);
+              } else {
+                console.log('Offer status update success (highest):', offerUpdateResult);
+              }
+              if (sortedOffers.length > 1) {
+                const otherIds = sortedOffers.slice(1).map(o => o.id);
+                const otherUpdateResult = await supabase
+                  .from('offers')
+                  .update({ status: 'waiting for final payment' })
+                  .in('id', otherIds);
+                if (otherUpdateResult.error) {
+                  console.error('Offer status update error (others):', otherUpdateResult.error, 'Params:', { ids: otherIds });
+                  toast.error('Failed to update other offers status: ' + otherUpdateResult.error.message);
+                } else {
+                  console.log('Offer status update success (others):', otherUpdateResult);
+                }
+              }
+            }
+            // Update item status to 'sold'
+            const { error: itemError, ...itemUpdateResult } = await supabase
+              .from('items')
+              .update({ status: 'sold' })
+              .eq('id', item.id);
+            if (itemError) {
+              console.error('Item status update error:', itemError, 'Params:', { id: item.id });
+              toast.error('Failed to update item status: ' + itemError.message);
+              throw itemError;
+            } else {
+              console.log('Item status update success:', itemUpdateResult);
+            }
+            toast.success('Offer accepted. Highest offer is now payment processing.');
+            // Refresh item and offers (assume parent will refresh state as needed)
+          } catch (err) {
+            toast.error('Failed to accept offer.');
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+        disabled={submitting}
+      >
+        {submitting ? 'Accepting...' : 'Accept Highest Offer'}
+      </button>
+    );
+  }
+
   return null;
 };
 
