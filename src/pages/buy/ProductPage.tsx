@@ -169,37 +169,7 @@ export const ProductPage: React.FC = () => {
       setSubmitting(false);
     }
   };
-
-  /*const handleBuyNow = async () => {
-    if (!user) {
-      toast.error('Please log in to buy this item');
-      navigate('/login');
-      return;
-    }
-
-    try {
-      setIsBuying(true);
-      const { error } = await supabase
-        .from('interests')
-        .insert({
-          listing_type: 'item',
-          listing_id: id,
-          interested_user_id: user.id,
-          message: 'I want to buy this item immediately!',
-          contact_info: user.email
-        });
-
-      if (error) throw error;
-
-      toast.success('Purchase request sent! The seller will contact you soon via email.');
-    } catch (error) {
-      console.error('Error processing purchase:', error);
-      toast.error('Failed to process purchase. Please try again.');
-    } finally {
-      setIsBuying(false);
-    }
-  };*/
-
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
