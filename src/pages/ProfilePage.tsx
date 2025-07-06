@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import ProfileSidebar from '../components/ProfileSidebar';
 import SellerMainContent from '../components/SellerMainContent';
 import BuyerActivitySection from '../components/BuyerActivitySection';
+import { User } from '@supabase/supabase-js';
 
 type Item = Database['public']['Tables']['items']['Row'] & { sale_type?: string };
 type Job = Database['public']['Tables']['jobs']['Row'];
@@ -30,7 +31,7 @@ export const ProfilePage: React.FC = () => {
   // Offers and bids state
   const [offersByItem, setOffersByItem] = useState<{ [itemId: string]: Offer[] }>({});
   const [bidsByItem, setBidsByItem] = useState<{ [itemId: string]: Bid[] }>({});
-  const { user, profile: authProfile } = useAuth() as { user: SupabaseUser | null; profile: Profile | null };
+  const { user, profile: authProfile, loading } = useAuth() as { user: User | null; profile: Profile | null; loading: boolean };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -154,6 +155,9 @@ export const ProfilePage: React.FC = () => {
     setUpdatedProfile((prev) => ({ ...prev, [name]: value }));
   };
 
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen text-lg text-gray-600">Loading...</div>;
+  }
   if (!user) {
     return <Navigate to="/login" />;
   }

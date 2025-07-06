@@ -171,6 +171,63 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
     }
   };
 
+  // Placeholder handler for completing payment (works for both offer and auction)
+  const handleCompletePayment = async (type: 'offer' | 'auction') => {
+    try {
+      setSubmitting(true);
+      if (!user) {
+        toast.error('Please log in to complete payment');
+        navigate('/login');
+        return;
+      }
+      if (type === 'offer') {
+        // Find user's offer
+        const myOffer = offers.find(offer => offer.user_id === user.id && offer.status === 'payment processing');
+        if (!myOffer) {
+          toast.error('No offer found to complete payment.');
+          return;
+        }
+        // Update offer status and item status
+        const { error: offerError } = await supabase
+          .from('offers')
+          .update({ status: 'completed' })
+          .eq('id', myOffer.id);
+        if (offerError) throw offerError;
+        const { error: itemError } = await supabase
+          .from('items')
+          .update({ status: 'closed' })
+          .eq('id', item.id);
+        if (itemError) throw itemError;
+        toast.success('Payment completed!');
+        // Optionally refresh offers/items here
+      } else if (type === 'auction') {
+        // Find user's bid
+        const myBid = bids.find(bid => bid.user_id === user.id && bid.status === 'payment processing');
+        if (!myBid) {
+          toast.error('No bid found to complete payment.');
+          return;
+        }
+        // Update bid status and item status
+        const { error: bidError } = await supabase
+          .from('bids')
+          .update({ status: 'completed' })
+          .eq('id', myBid.id);
+        if (bidError) throw bidError;
+        const { error: itemError } = await supabase
+          .from('items')
+          .update({ status: 'closed' })
+          .eq('id', item.id);
+        if (itemError) throw itemError;
+        toast.success('Payment completed!');
+        // Optionally refresh bids/items here
+      }
+    } catch (err) {
+      toast.error('Failed to complete payment.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Sale type logic for action buttons
   if (item.sale_type === 'fixed') {
     return hasShownInterest ? (
@@ -216,6 +273,43 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
   }
 
   if (item.sale_type === 'offer') {
+    // If item is sold/closed, show payment/status UI for buyer
+    if (item.status === 'sold' || item.status === 'closed') {
+      const myOffer = offers.find(offer => offer.user_id === user?.id);
+      if (myOffer && myOffer.status === 'payment processing') {
+        return (
+          <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
+            Offer accepted. Please proceed with payment.
+            <button
+              className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              onClick={() => handleCompletePayment('offer')}
+              disabled={submitting}
+            >
+              {submitting ? 'Processing...' : 'Complete Payment'}
+            </button>
+          </div>
+        );
+      }
+      if (myOffer && myOffer.status === 'completed') {
+        return (
+          <div className="bg-green-100 text-green-800 p-4 rounded mb-4 font-semibold">
+            Payment completed. Thank you!
+          </div>
+        );
+      }
+      if (myOffer && myOffer.status === 'failed') {
+        return (
+          <div className="bg-red-100 text-red-800 p-4 rounded mb-4 font-semibold">
+            Your offer was not successful or was cancelled.
+          </div>
+        );
+      }
+      return (
+        <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
+          Offer has ended.
+        </div>
+      );
+    }
     return (
       <React.Fragment>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Make an Offer</h3>
@@ -355,7 +449,13 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
             Auction ended. Item is sold.
             <div className="mt-2 bg-green-100 text-green-800 p-2 rounded font-semibold">
               You are the highest bidder! Please proceed with payment.
-              <button className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Complete Payment</button>
+              <button
+                className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                onClick={() => handleCompletePayment('auction')}
+                disabled={submitting}
+              >
+                {submitting ? 'Processing...' : 'Complete Payment'}
+              </button>
             </div>
           </div>
         );
@@ -365,7 +465,13 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
         return (
           <div className="bg-yellow-100 text-yellow-900 p-4 rounded mb-4 font-semibold">
             Offer accepted. Please proceed with payment.
-            <button className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Complete Payment</button>
+            <button
+              className="ml-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              onClick={() => handleCompletePayment('offer')}
+              disabled={submitting}
+            >
+              {submitting ? 'Processing...' : 'Complete Payment'}
+            </button>
           </div>
         );
       }
