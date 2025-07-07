@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Offer, Bid } from '../types/supabase';
 import { Database } from '../types/supabase';
+import { useCurrency } from '../context/CurrencyContext';
 
 type Interest = Database['public']['Tables']['interests']['Row'] & {
   profiles: {
@@ -30,6 +31,7 @@ export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listing
   const [interests, setInterests] = useState<Interest[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
+  const { formatPrice, currentCurrency } = useCurrency();
 
   useEffect(() => {
     if (offers || bids) {
@@ -94,7 +96,7 @@ export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listing
                   </div>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-900">{offer.profiles?.username || 'Anonymous User'}</p>
-                    <p className="text-sm text-purple-700 font-semibold">{offer.amount}</p>
+                    <p className="text-sm text-purple-700 font-semibold">{formatPrice(convertPrice(offer.amount, 'USD', currentCurrency?.code), currentCurrency?.code)}</p>
                     <p className="text-sm text-gray-500">Offered on {new Date(offer.created_at).toLocaleDateString()}</p>
                     {offer.message && <p className="mt-2 text-sm text-gray-800 bg-purple-50 p-3 rounded">{offer.message}</p>}
                   </div>
@@ -130,7 +132,7 @@ export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listing
                   </div>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-900">{bid.profiles?.username || 'Anonymous User'}</p>
-                    <p className="text-sm text-purple-700 font-semibold">{bid.amount}</p>
+                    <p className="text-sm text-purple-700 font-semibold">{formatPrice(convertPrice(bid.amount, 'USD', currentCurrency?.code), currentCurrency?.code)}</p>
                     <p className="text-sm text-gray-500">Bid on {new Date(bid.created_at).toLocaleDateString()}</p>
                     {bid.message && <p className="mt-2 text-sm text-gray-800 bg-purple-50 p-3 rounded">{bid.message}</p>}
                   </div>
@@ -245,3 +247,11 @@ export const InterestsList: React.FC<InterestsListProps> = ({ listingId, listing
     </div>
   );
 };
+
+function convertPrice(amount: number, fromCurrency: string, toCurrency: string | undefined): number {
+  // For now, let's assume the conversion rate from USD to the target currency is 1:1
+  // In a real application, you would fetch the current conversion rate from an API
+  if (toCurrency === 'USD' || !toCurrency) return amount;
+  const conversionRate = 1; // Placeholder conversion rate
+  return amount * conversionRate;
+}

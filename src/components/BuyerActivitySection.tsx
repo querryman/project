@@ -2,6 +2,7 @@ import React from 'react';
 import { useBuyerActivity } from '../lib/useBuyerActivity';
 import { InterestsList } from './InterestsList';
 import { supabase } from '../lib/supabase';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface BuyerActivitySectionProps {
   userId: string;
@@ -9,6 +10,7 @@ interface BuyerActivitySectionProps {
 
 const BuyerActivitySection: React.FC<BuyerActivitySectionProps> = ({ userId }) => {
   const { offers, bids, interests, items, loading } = useBuyerActivity(userId);
+  const { convertPrice, currentCurrency, formatPrice } = useCurrency();
 
   if (loading) return <div>Loading...</div>;
   if (items.length === 0) return <div className="text-gray-500">No activity yet.</div>;
@@ -66,9 +68,15 @@ const BuyerActivitySection: React.FC<BuyerActivitySectionProps> = ({ userId }) =
             <InterestsList
               listingId={item.id}
               listingType="item"
-              offers={myOffer ? [myOffer] : undefined}
+              offers={myOffer ? [{
+                ...myOffer,
+                amount: convertPrice(myOffer.amount, 'USD', currentCurrency?.code || 'USD')
+              }] : undefined}
               showOffers={!!myOffer}
-              bids={myBid ? [myBid] : undefined}
+              bids={myBid ? [{
+                ...myBid,
+                amount: convertPrice(myBid.amount, 'USD', currentCurrency?.code || 'USD')
+              }] : undefined}
               showBids={!!myBid}
             />
             {/* Show bid/offer status and payment button for buyer */}

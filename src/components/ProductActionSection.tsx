@@ -16,6 +16,7 @@ interface ProductActionSectionProps {
   offers: any[];
   bids: any[];
   fetchingOffers: boolean;
+  fetchingBids: boolean;
   formatPrice: (amount: number, currencyCode?: string) => string;
   navigate: (path: string) => void;
   setSubmitting: (val: boolean) => void;
@@ -40,6 +41,7 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
   offers,
   bids,
   fetchingOffers,
+  fetchingBids,
   formatPrice,
   navigate,
   setSubmitting,
@@ -354,7 +356,7 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
                   )}
                   <div>
                     <span className="font-medium">{offer.profiles?.username || 'Anonymous'}</span>
-                    <span className="ml-2 text-purple-700 font-semibold">{formatPrice(offer.amount)}</span>
+                    <span className="ml-2 text-purple-700 font-semibold">{formatPrice(convertPrice(offer.amount, 'USD', currentCurrency?.code), currentCurrency?.code)}</span>
                     <span className="ml-2 text-xs text-gray-500">{new Date(offer.created_at).toLocaleDateString()}</span>
                     {offer.message && <div className="text-xs text-gray-700 mt-1">{offer.message}</div>}
                   </div>
@@ -522,6 +524,35 @@ const ProductActionSection: React.FC<ProductActionSectionProps> = ({
         >
           {submitting ? 'Placing...' : 'Place Bid'}
         </button>
+        {/* List of bids */}
+        <div className="mt-6">
+          <h4 className="font-semibold mb-2">Bids</h4>
+          {fetchingBids ? (
+            <div className="text-gray-500">Loading bids...</div>
+          ) : bids.length === 0 ? (
+            <div className="text-gray-500">No bids yet.</div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {bids.map((bid) => (
+                <li key={bid.id} className="py-2 flex items-center">
+                  {bid.profiles?.avatar_url ? (
+                    <img src={bid.profiles.avatar_url} alt={bid.profiles.username || 'User'} className="h-8 w-8 rounded-full mr-2" />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-yellow-200 flex items-center justify-center mr-2">
+                      <span className="text-sm font-medium text-yellow-800">{(bid.profiles?.username || 'U').charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-medium">{bid.profiles?.username || 'Anonymous'}</span>
+                    <span className="ml-2 text-yellow-700 font-semibold">{formatPrice(convertPrice(bid.amount, 'USD', currentCurrency?.code), currentCurrency?.code)}</span>
+                    <span className="ml-2 text-xs text-gray-500">{new Date(bid.created_at).toLocaleDateString()}</span>
+                    {bid.message && <div className="text-xs text-gray-700 mt-1">{bid.message}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </>
     );
   }
